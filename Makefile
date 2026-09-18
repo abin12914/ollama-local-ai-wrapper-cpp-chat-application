@@ -22,10 +22,10 @@ run: $(TARGET)
 install: $(TARGET)
 	mkdir -p $(HOME)/.local/bin
 	mkdir -p $(HOME)/.local/share/applications
-	mkdir -p $(HOME)/.local/share/icons/hicolor/256x256/apps
+	mkdir -p $(HOME)/.local/share/icons/hicolor/scalable/apps
 	cp $(TARGET) $(HOME)/.local/bin/$(TARGET)
-	cp app-icon.png $(HOME)/.local/bin/app-icon.png
-	cp app-icon.png $(HOME)/.local/share/icons/hicolor/256x256/apps/$(TARGET).png
+	cp app-icon.svg $(HOME)/.local/bin/app-icon.svg
+	cp app-icon.svg $(HOME)/.local/share/icons/hicolor/scalable/apps/$(TARGET).svg
 	printf '[Desktop Entry]\nName=AI Chat Local\nComment=Local AI chat client\nExec=%s/.local/bin/%s\nIcon=%s\nTerminal=false\nType=Application\nCategories=Utility;\n' "$(HOME)" "$(TARGET)" "$(TARGET)" > $(HOME)/.local/share/applications/$(TARGET).desktop
 
 clean:

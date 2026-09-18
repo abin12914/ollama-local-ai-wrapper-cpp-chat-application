@@ -10,10 +10,10 @@ std::string get_icon_path() {
         std::string path(executable_path);
         size_t separator = path.find_last_of('/');
         if (separator != std::string::npos) {
-            return path.substr(0, separator + 1) + "app-icon.png";
+            return path.substr(0, separator + 1) + "app-icon.svg";
         }
     }
-    return "app-icon.png";
+    return "app-icon.svg";
 }
 
 int main(int argc, char *argv[]) {

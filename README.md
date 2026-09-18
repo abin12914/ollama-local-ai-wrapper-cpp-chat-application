@@ -177,9 +177,9 @@ This installs the application without requiring root privileges:
 
 ```text
 ~/.local/bin/ai-chat-local
-~/.local/bin/app-icon.png
+~/.local/bin/app-icon.svg
 ~/.local/share/applications/ai-chat-local.desktop
-~/.local/share/icons/hicolor/256x256/apps/ai-chat-local.png
+~/.local/share/icons/hicolor/scalable/apps/ai-chat-local.svg
 ```
 
 The desktop file allows AI-Chat-Local to appear in the Ubuntu application menu. If the launcher does not appear immediately, log out and back in, or refresh the desktop application cache if required by the desktop environment.
@@ -188,9 +188,9 @@ To remove the installed user-local files:
 
 ```bash
 rm -f ~/.local/bin/ai-chat-local
-rm -f ~/.local/bin/app-icon.png
+rm -f ~/.local/bin/app-icon.svg
 rm -f ~/.local/share/applications/ai-chat-local.desktop
-rm -f ~/.local/share/icons/hicolor/256x256/apps/ai-chat-local.png
+rm -f ~/.local/share/icons/hicolor/scalable/apps/ai-chat-local.svg
 ```
 
 ## Settings
@@ -335,7 +335,7 @@ Confirm that the files exist:
 ```bash
 ls -l ~/.local/bin/ai-chat-local
 ls -l ~/.local/share/applications/ai-chat-local.desktop
-ls -l ~/.local/share/icons/hicolor/256x256/apps/ai-chat-local.png
+ls -l ~/.local/share/icons/hicolor/scalable/apps/ai-chat-local.svg
 ```
 
 Restart the desktop session if the application menu has not refreshed.
