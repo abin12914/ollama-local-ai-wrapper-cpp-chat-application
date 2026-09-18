@@ -1,0 +1,24 @@
+# Build artifacts
+*.o
+ai-chat-local
+
+# Local configuration and runtime data
+settings.ini
+*.log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Generated packaging files
+*.deb
+*.AppImage
+build/
+dist/
