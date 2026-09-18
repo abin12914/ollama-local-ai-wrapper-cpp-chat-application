@@ -2,9 +2,17 @@
 
 #include <gtk/gtk.h>
 #include <string>
+#include <vector>
+
+struct ConversationMessage {
+	std::string role;
+	std::string content;
+};
 
 extern std::string MODEL_NAME;
 extern std::string OLLAMA_ENDPOINT;
+extern std::vector<ConversationMessage> conversation_history;
+extern std::string current_ai_response;
 
 extern GtkWidget *chat_buffer_view;
 extern GtkTextBuffer *chat_buffer;

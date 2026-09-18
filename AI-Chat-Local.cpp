@@ -348,8 +348,21 @@ void scroll_chat_to_bottom() {
         return;
     }
 
-    GtkTextMark *mark = gtk_text_buffer_get_insert(chat_buffer);
-    gtk_text_view_scroll_to_mark(GTK_TEXT_VIEW(chat_buffer_view), mark, 0.0, FALSE, 0, 1.0);
+    GtkTextIter end;
+    gtk_text_buffer_get_end_iter(chat_buffer, &end);
+    gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(chat_buffer_view), &end, 0.0, FALSE, 0.0, 1.0);
+    gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(chat_buffer_view), &end, 0.0, TRUE, 0.0, 1.0);
+}
+
+gboolean scroll_chat_to_bottom_idle(gpointer user_data) {
+    (void)user_data;
+    scroll_chat_to_bottom();
+    return G_SOURCE_REMOVE;
+}
+
+void request_chat_scroll_to_bottom() {
+    scroll_chat_to_bottom();
+    g_idle_add(scroll_chat_to_bottom_idle, NULL);
 }
 
 void append_to_chat(const std::string &text) {
@@ -362,7 +375,7 @@ void append_to_chat(const std::string &text) {
     gtk_text_buffer_insert(chat_buffer, &end, text.c_str(), -1);
     
     // Automatically scroll window to the absolute bottom
-    scroll_chat_to_bottom();
+    request_chat_scroll_to_bottom();
 }
 
 void insert_markdown_span(const std::string &text, GtkTextTag *tag) {
@@ -568,7 +581,7 @@ void append_colored_message(const std::string &prefix, const std::string &messag
         gtk_text_buffer_insert(chat_buffer, &end, "\n", 1);
     }
 
-    scroll_chat_to_bottom();
+    request_chat_scroll_to_bottom();
     while (gtk_events_pending()) gtk_main_iteration();
 }
 
@@ -600,7 +613,7 @@ void append_ai_response_chunk(const std::string &response) {
 
     GtkTextTag *message_tag = gtk_text_buffer_create_tag(chat_buffer, NULL, "foreground", "#22c55e", NULL);
     gtk_text_buffer_apply_tag(chat_buffer, message_tag, &start, &end);
-    scroll_chat_to_bottom();
+    request_chat_scroll_to_bottom();
 }
 
 struct CurlStringBuffer {
@@ -614,6 +627,44 @@ struct AIRequestData {
     std::string prompt;
 };
 
+std::string json_escape(const std::string &value) {
+    std::string escaped;
+    for (char character : value) {
+        switch (character) {
+            case '"': escaped += "\\\""; break;
+            case '\\': escaped += "\\\\"; break;
+            case '\n': escaped += "\\n"; break;
+            case '\r': escaped += "\\r"; break;
+            case '\t': escaped += "\\t"; break;
+            default: escaped += character; break;
+        }
+    }
+    return escaped;
+}
+
+std::string build_conversation_prompt(const std::string &latest_message) {
+    std::string prompt = "You are a helpful assistant. Continue the conversation using the context below.\n\n";
+    for (const ConversationMessage &message : conversation_history) {
+        prompt += message.role + ":\n" + message.content + "\n\n";
+    }
+    prompt += "User:\n" + latest_message + "\n\nAssistant:\n";
+    return prompt;
+}
+
+void trim_conversation_history() {
+    const size_t maximum_messages = 20;
+    if (conversation_history.size() > maximum_messages) {
+        conversation_history.erase(
+            conversation_history.begin(),
+            conversation_history.begin() + (conversation_history.size() - maximum_messages));
+    }
+}
+
+void clear_conversation_history() {
+    conversation_history.clear();
+    current_ai_response.clear();
+}
+
 gboolean handle_ai_message_ready(gpointer user_data) {
     auto *message = static_cast<std::string*>(user_data);
     if (!message) {
@@ -626,6 +677,7 @@ gboolean handle_ai_message_ready(gpointer user_data) {
     } else {
         append_ai_response_chunk(*message);
     }
+    current_ai_response += *message;
 
     delete message;
     return G_SOURCE_REMOVE;
@@ -634,6 +686,11 @@ gboolean handle_ai_message_ready(gpointer user_data) {
 gboolean handle_ai_response_finished(gpointer user_data) {
     (void)user_data;
     stop_thinking_animation();
+    if (!current_ai_response.empty()) {
+        conversation_history.push_back({"Assistant", current_ai_response});
+        trim_conversation_history();
+        current_ai_response.clear();
+    }
     append_to_chat("\n");
     return G_SOURCE_REMOVE;
 }
@@ -695,7 +752,7 @@ static gpointer ai_request_worker(gpointer user_data) {
     CURL *curl = curl_easy_init();
     if (curl) {
         std::string url = ollama_url("/api/generate");
-        std::string json_payload = "{\"model\":\"" + request->model + "\",\"prompt\":\"" + request->prompt + "\"}";
+        std::string json_payload = "{\"model\":\"" + json_escape(request->model) + "\",\"prompt\":\"" + json_escape(request->prompt) + "\"}";
 
         CurlStringBuffer buffer;
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -861,6 +918,7 @@ void unload_current_model() {
 
     if (!is_ollama_running()) {
         MODEL_NAME = "None";
+        clear_conversation_history();
         update_status_label();
         return;
     }
@@ -868,6 +926,7 @@ void unload_current_model() {
     CURL *curl = curl_easy_init();
     if (!curl) {
         MODEL_NAME = "None";
+        clear_conversation_history();
         update_status_label();
         return;
     }
@@ -885,6 +944,7 @@ void unload_current_model() {
     curl_easy_cleanup(curl);
 
     MODEL_NAME = "None";
+    clear_conversation_history();
     update_status_label();
     append_system_message("Model unloaded.", "warning");
 }
@@ -909,6 +969,7 @@ void on_set_model() {
     }
 
     MODEL_NAME = selected_model;
+    clear_conversation_history();
     update_status_label();
     append_system_message("Switching model to " + MODEL_NAME + "...", "info");
     gtk_widget_set_sensitive(entry_input, FALSE);
@@ -1133,10 +1194,12 @@ void on_send_message(GtkEntry *entry, gpointer user_data) {
     // Clear user typing box and update history panel immediately
     gtk_entry_set_text(entry, "");
     append_user_message(text);
+    conversation_history.push_back({"User", text});
+    trim_conversation_history();
     ai_response_started = false;
     start_thinking_animation();
 
-    auto *request = new AIRequestData{MODEL_NAME, text};
+    auto *request = new AIRequestData{MODEL_NAME, build_conversation_prompt(text)};
     g_thread_new("ai-request", ai_request_worker, request);
 }
 

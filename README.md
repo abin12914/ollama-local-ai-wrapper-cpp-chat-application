@@ -60,6 +60,7 @@ If Ollama is installed as a system service, the application can also request ser
 - Local model selection through Ollama
 - Ollama service status indicator and switch
 - Asynchronous AI requests using a background worker thread
+- Multi-turn conversation context sent with each request
 - Responsive interface while a model is generating a response
 - Animated `Thinking` indicator during generation
 - Streaming response assembly into one AI message
@@ -241,6 +242,18 @@ The main flow is:
 8. The GTK text buffer renders the AI response and applies Markdown text tags.
 9. The thinking indicator is stopped after the response is complete.
 
+### Conversation context
+
+The application keeps recent user and assistant turns in memory. Before each
+request, it sends the previous turns together with the new user message so the
+model can answer with conversational context instead of seeing each prompt as
+an isolated request. The history is currently bounded to the most recent 20
+messages to limit prompt growth.
+
+Conversation history is cleared when the selected model changes or when the
+current model is unloaded. It is not written to disk, so restarting the
+application starts a new conversation.
+
 Network calls must not be moved into the GTK event loop because they can block the interface while Ollama is busy.
 
 ## Monitoring Performance
@@ -346,6 +359,13 @@ make clean
 
 ## License and Contributions
 
-No license has been specified for this project yet. Add an explicit license before distributing it publicly or incorporating third-party code.
+This project is licensed under the [MIT License](LICENSE).
+
+Copyright (c) 2026 iamab.in.
+
+The MIT License permits use, copying, modification, distribution, sublicensing,
+and sale of the software, provided that the copyright and permission notices
+are included in copies or substantial portions of the software. The software is
+provided without warranty.
 
 Contributions can be made by improving the GTK interface, adding robust Markdown parsing, improving Ollama error reporting, adding automated tests, or extending packaging support.
