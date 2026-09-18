@@ -4,11 +4,18 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <cstdlib>
 
 #include "app_state.h"
 
 std::string get_settings_path() {
     return std::string(g_get_user_config_dir()) + "/ai-chat-local/settings.ini";
+}
+
+const int MAX_CONVERSATION_CONTEXT_LIMIT = 100;
+
+void normalize_conversation_context_limit() {
+    conversation_context_limit = std::max(1, std::min(conversation_context_limit, MAX_CONVERSATION_CONTEXT_LIMIT));
 }
 
 void load_settings() {
@@ -17,6 +24,10 @@ void load_settings() {
     std::string path = get_settings_path();
 
     if (g_key_file_load_from_file(key_file, path.c_str(), G_KEY_FILE_NONE, &error)) {
+        if (g_key_file_has_key(key_file, "Conversation", "context_limit", NULL)) {
+            conversation_context_limit = g_key_file_get_integer(key_file, "Conversation", "context_limit", NULL);
+        }
+        normalize_conversation_context_limit();
         gchar *ollama_endpoint = g_key_file_get_string(key_file, "Ollama", "endpoint", NULL);
         gchar *window_color = g_key_file_get_string(key_file, "Colors", "window", NULL);
         gchar *chat_color = g_key_file_get_string(key_file, "Colors", "chat", NULL);
@@ -70,6 +81,8 @@ void load_settings() {
 
 void save_settings() {
     GKeyFile *key_file = g_key_file_new();
+    normalize_conversation_context_limit();
+    g_key_file_set_integer(key_file, "Conversation", "context_limit", conversation_context_limit);
     g_key_file_set_string(key_file, "Ollama", "endpoint", OLLAMA_ENDPOINT.c_str());
     gchar *window_color = gdk_rgba_to_string(&window_background);
     gchar *chat_color = gdk_rgba_to_string(&chat_background);
@@ -180,6 +193,8 @@ void on_ollama_endpoint_changed(GtkEntry *entry, gpointer user_data) {
     }
 }
 
+void on_context_limit_changed(GtkSpinButton *spin_button, gpointer user_data);
+
 void on_window_color_set(GtkColorButton *button, gpointer user_data) {
     (void)user_data;
     gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(button), &window_background);
@@ -289,6 +304,16 @@ void show_settings_dialog(GtkWidget *parent) {
     gtk_box_pack_start(GTK_BOX(endpoint_row), endpoint_entry, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(settings_box), endpoint_row, FALSE, FALSE, 0);
     g_signal_connect(endpoint_entry, "changed", G_CALLBACK(on_ollama_endpoint_changed), NULL);
+
+    GtkWidget *context_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    GtkWidget *context_label = gtk_label_new("Conversation context messages");
+    GtkAdjustment *context_adjustment = gtk_adjustment_new(
+        conversation_context_limit, 1, MAX_CONVERSATION_CONTEXT_LIMIT, 1, 5, 0);
+    GtkWidget *context_spin = gtk_spin_button_new(context_adjustment, 1, 0);
+    gtk_box_pack_start(GTK_BOX(context_row), context_label, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(context_row), context_spin, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(settings_box), context_row, FALSE, FALSE, 0);
+    g_signal_connect(context_spin, "value-changed", G_CALLBACK(on_context_limit_changed), NULL);
 
     gtk_widget_show_all(dialog);
     gtk_dialog_run(GTK_DIALOG(dialog));
@@ -642,22 +667,31 @@ std::string json_escape(const std::string &value) {
     return escaped;
 }
 
-std::string build_conversation_prompt(const std::string &latest_message) {
+std::string build_conversation_prompt() {
     std::string prompt = "You are a helpful assistant. Continue the conversation using the context below.\n\n";
     for (const ConversationMessage &message : conversation_history) {
         prompt += message.role + ":\n" + message.content + "\n\n";
     }
-    prompt += "User:\n" + latest_message + "\n\nAssistant:\n";
+    prompt += "Assistant:\n";
     return prompt;
 }
 
 void trim_conversation_history() {
-    const size_t maximum_messages = 20;
+    normalize_conversation_context_limit();
+    const size_t maximum_messages = static_cast<size_t>(conversation_context_limit);
     if (conversation_history.size() > maximum_messages) {
         conversation_history.erase(
             conversation_history.begin(),
             conversation_history.begin() + (conversation_history.size() - maximum_messages));
     }
+}
+
+void on_context_limit_changed(GtkSpinButton *spin_button, gpointer user_data) {
+    (void)user_data;
+    conversation_context_limit = gtk_spin_button_get_value_as_int(spin_button);
+    normalize_conversation_context_limit();
+    trim_conversation_history();
+    save_settings();
 }
 
 void clear_conversation_history() {
@@ -1199,7 +1233,7 @@ void on_send_message(GtkEntry *entry, gpointer user_data) {
     ai_response_started = false;
     start_thinking_animation();
 
-    auto *request = new AIRequestData{MODEL_NAME, build_conversation_prompt(text)};
+    auto *request = new AIRequestData{MODEL_NAME, build_conversation_prompt()};
     g_thread_new("ai-request", ai_request_worker, request);
 }
 

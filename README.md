@@ -61,6 +61,7 @@ If Ollama is installed as a system service, the application can also request ser
 - Ollama service status indicator and switch
 - Asynchronous AI requests using a background worker thread
 - Multi-turn conversation context sent with each request
+- User-configurable conversation context length
 - Responsive interface while a model is generating a response
 - Animated `Thinking` indicator during generation
 - Streaming response assembly into one AI message
@@ -249,6 +250,11 @@ request, it sends the previous turns together with the new user message so the
 model can answer with conversational context instead of seeing each prompt as
 an isolated request. The history is currently bounded to the most recent 20
 messages to limit prompt growth.
+
+The **Conversation context messages** setting changes this limit. It defaults to
+20 messages and accepts values from 1 to 100. Reducing the value immediately
+removes the oldest turns beyond the new limit. The selected value is saved in
+the user settings file and restored on startup.
 
 Conversation history is cleared when the selected model changes or when the
 current model is unloaded. It is not written to disk, so restarting the

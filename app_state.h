@@ -13,6 +13,7 @@ extern std::string MODEL_NAME;
 extern std::string OLLAMA_ENDPOINT;
 extern std::vector<ConversationMessage> conversation_history;
 extern std::string current_ai_response;
+extern int conversation_context_limit;
 
 extern GtkWidget *chat_buffer_view;
 extern GtkTextBuffer *chat_buffer;

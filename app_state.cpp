@@ -4,6 +4,7 @@ std::string MODEL_NAME = "llama3.2:1b";
 std::string OLLAMA_ENDPOINT = "http://localhost:11434";
 std::vector<ConversationMessage> conversation_history;
 std::string current_ai_response;
+int conversation_context_limit = 20;
 
 GtkWidget *chat_buffer_view = nullptr;
 GtkTextBuffer *chat_buffer = nullptr;
